@@ -11,7 +11,6 @@ headless host. The actual X/D3D connection is opened at the first call to
 
 from __future__ import annotations
 
-import io
 import threading
 from typing import Any
 
@@ -57,8 +56,15 @@ class MssBackend:
 
     def capture_frame(self, target: Target | None = None) -> bytes | None:
         sct = self._ensure_sct()
-        # mss.shot writes a PNG to ``output`` and returns the value. Using
-        # BytesIO keeps the data in memory only.
-        out = io.BytesIO()
-        sct.shot(mon=1, output=out)
-        return out.getvalue()
+        # mss.shot() returns the filename of the saved PNG. We then read it
+        # into memory and delete the temp file.
+        filename = sct.shot(mon=1)
+        try:
+            with open(filename, "rb") as f:
+                return f.read()
+        finally:
+            import os
+            try:
+                os.remove(filename)
+            except OSError:
+                pass

@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "screen-mcp"
 version = "0.1.0"
 description = "MCP server for on-demand screen capture + multi-frame vision analysis. Pluggable Anthropic-API-compatible backend (works with official API and domestic-model proxies)."
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 readme = "README.md"
 authors = [{ name = "screen-mcp" }]
 

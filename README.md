@@ -25,6 +25,18 @@ MCP 传输层（stdio）在所有平台都能跑；只有 `mode='window'` 采集
 
 ## 安装
 
+推荐用 [`uv`](https://github.com/astral-sh/uv) 创建虚拟环境并安装，避免污染全局 Python。
+
+```bash
+# 创建虚拟环境（如果还没有）
+uv venv .venv
+
+# 以 editable 模式安装（含 dev 和 windows 依赖）
+uv pip install -e ".[dev,windows]"
+```
+
+传统 `pip` 也可以（前提是已经在虚拟环境里）：
+
 ```bash
 # Linux / macOS（开发环境）
 pip install -e ".[dev]"
@@ -78,14 +90,33 @@ ANTHROPIC_API_KEY=your-proxy-key
 
 ## 接入 Claude Code
 
-把这个 server 加到 `claude mcp` 配置：
+### 方式一：`.mcp.json`（推荐）
+
+在项目根目录创建 `.mcp.json`：
+
+```json
+{
+  "mcpServers": {
+    "screen-mcp": {
+      "command": "C:\\Users\\xzs\\Desktop\\mcp_test\\.venv\\Scripts\\screen-mcp.exe"
+    }
+  }
+}
+```
+
+然后在 `~/.claude/settings.json` 里批准这个 server：
+
+```json
+{
+  "enabledMcpjsonServers": ["screen-mcp"]
+}
+```
+
+### 方式二：`claude mcp add` 命令
 
 ```bash
 # 在项目目录下
-claude mcp add screen-mcp -- python -m screen_mcp.server
-
-# 或者用装好的 console script
-claude mcp add screen-mcp -- screen-mcp
+claude mcp add screen-mcp -- .venv/Scripts/screen-mcp.exe
 ```
 
 之后在 Claude Code 会话里，6 个 tool 就以 `start_capture`、`stop_capture`、`capture_now`、`set_polling`、`list_windows`、`analyze_screen` 的名字可用。
@@ -156,6 +187,23 @@ xvfb-run -a pytest tests/test_capture_linux.py -v -k real_mss
 ```
 
 `test_real_mss_capture_under_xvfb` 测试在没装 `Xvfb` 时会自动 skip。
+
+### 已知问题与修复
+
+**`mss.shot(output=BytesIO)` 的陷阱** — 早期版本里 `MssBackend.capture_frame` 把 `io.BytesIO()` 当成 `output` 参数传给 `sct.shot()`，导致 `'_io.BytesIO' object has no attribute 'format'` 错误。
+
+原因：`mss.shot()` 的 `output` 参数期望的是**文件名模板字符串**（如 `"{mon}.png"`），不是 file-like 对象；mss 内部会对它调用 `.format()`，而 BytesIO 没有这个方法。
+
+修复方案：先 `sct.shot(mon=1)` 拿到返回的文件名，读出 bytes 再删掉临时文件：
+
+```python
+filename = sct.shot(mon=1)
+try:
+    with open(filename, "rb") as f:
+        return f.read()
+finally:
+    os.remove(filename)
+```
 
 ### 项目结构
 
